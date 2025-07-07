@@ -157,14 +157,6 @@ The command format `rule:variant` allows you to specify exactly what analysis to
 - `Unsupported variant`: Verify the variant is supported for the specified rule
 - `Could not parse XML file`: The proxy bundle may be corrupted or in an unexpected format
 
-## Contributing
-
-To add new rules or modify existing functionality:
-
-1. Update the `AVAILABLE_RULES` dictionary in `review.py`
-2. Implement the rule logic in a new function
-3. Add the rule execution to the main processing loop
-4. Update this README with the new rule documentation
 
 ## License
 
