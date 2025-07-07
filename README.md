@@ -1,4 +1,4 @@
-# Proxy Review Tool
+# Proxy Optimization Tool
 
 A Python script that analyzes and cleans Apigee proxy bundles to identify issues and apply fixes based on best practices.
 
@@ -80,7 +80,7 @@ This command will:
 
 #### Example 3: Analyze sequential JavaScript steps
 ```bash
-python review.py sequential-js:report-only
+python review_optimize.py sequential-js:report-only
 ```
 This command will:
 - Identify JavaScript policies that run sequentially without conditions
