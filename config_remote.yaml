@@ -1,0 +1,3 @@
+mode: remote_proxy
+org: bap-amer-west-demo1
+env: default-dev

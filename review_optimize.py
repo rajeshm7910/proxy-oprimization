@@ -7,6 +7,8 @@ import zipfile
 import logging
 import argparse
 from typing import Dict, List, Tuple
+import yaml
+import requests
 
 # --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,7 +20,7 @@ OUTPUT_PROXIES_DIR = OUTPUT_DIR / 'proxies'
 UNATTACHED_POLICIES_REPORT_PATH = OUTPUT_DIR / 'unattached_policies_summary.txt'
 SIZE_SUMMARY_REPORT_PATH = OUTPUT_DIR / 'refactor_summary_report.md'
 SEQUENTIAL_JS_REPORT_PATH = OUTPUT_DIR / 'sequential_js_steps_report.txt'
-TEMP_DIR = SCRIPT_DIR / 'temp_proxies'
+TEMP_DIR = PROXIES_DIR / 'tmp'
 
 # Define available rules and their supported variants
 AVAILABLE_RULES = {
@@ -282,11 +284,52 @@ def parse_rule_arguments(rule_args: List[str]) -> Dict[str, str]:
         parsed_rules[rule_name] = variant
     return parsed_rules
 
+def load_config(config_path: Path) -> dict:
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
+def download_remote_proxies(config: dict, token: str, proxies_dir: Path):
+    org = config['org']
+    env = config['env']
+    proxies = config.get('proxies')  # Optional: list of proxies to download, else all deployed
+    mgmt_url = f"https://apigee.googleapis.com/v1/organizations/{org}/environments/{env}/deployments"
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = requests.get(mgmt_url, headers=headers)
+    resp.raise_for_status()
+    deployments = resp.json().get('deployments', [])
+    if not deployments:
+        logging.warning(f"No deployed proxies found in org={org}, env={env}")
+        return
+    proxies_to_download = proxies if proxies else [d['apiProxy'] for d in deployments]
+    for proxy in deployments:
+        name = proxy['apiProxy']
+        if name not in proxies_to_download:
+            continue
+        # Get the deployed revision (as string)
+        rev = str(proxy['revision']) if 'revision' in proxy else None
+        if not rev:
+            logging.warning(f"No deployed revision found for proxy {name}")
+            continue
+        # Download the bundle
+        bundle_url = f"https://apigee.googleapis.com/v1/organizations/{org}/apis/{name}/revisions/{rev}?format=bundle"
+        logging.info(f"Downloading {name} revision {rev}...")
+        bundle_resp = requests.get(bundle_url, headers=headers)
+        if bundle_resp.status_code != 200:
+            logging.error(f"Failed to download {name} rev {rev}: {bundle_resp.text}")
+            continue
+        proxies_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = proxies_dir / f"{name}_rev{rev}.zip"
+        with open(zip_path, 'wb') as f:
+            f.write(bundle_resp.content)
+        logging.info(f"Downloaded {name} rev {rev} to {zip_path}")
+
 def main():
     parser = argparse.ArgumentParser(
         description="Analyzes and cleans Apigee proxy bundles based on specified rules.",
         formatter_class=argparse.RawTextHelpFormatter
     )
+    parser.add_argument('--config', required=True, help='Path to YAML config file.')
+    parser.add_argument('--token', required=False, help='OAuth2 token for Apigee Management API (required for remote_proxy mode).')
     parser.add_argument(
         'rules',
         nargs='+',
@@ -298,6 +341,20 @@ def main():
              "  - sequential-js:     [report-only]"
     )
     args = parser.parse_args()
+
+    # Load config
+    config = load_config(Path(args.config))
+    mode = config.get('mode', 'local_proxy')
+    if mode not in ('local_proxy', 'remote_proxy'):
+        raise ValueError(f"Unknown mode in config: {mode}")
+
+    if mode == 'remote_proxy':
+        if not args.token:
+            parser.error("--token is required for remote_proxy mode.")
+        download_remote_proxies(config, args.token, PROXIES_DIR)
+    elif mode == 'local_proxy':
+        if args.token:
+            logging.warning("--token argument is ignored in local_proxy mode.")
 
     try:
         rules_to_run = parse_rule_arguments(args.rules)

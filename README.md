@@ -26,13 +26,14 @@ This tool helps you maintain clean and efficient Apigee proxy bundles by:
 
 - Python 3.7 or higher
 - Apigee proxy bundles in ZIP format
+- A configuration YAML file: `config_local.yaml` or `config_remote.yaml`
 
 ## Setup
 
 1. **Clone or download the repository**
    ```bash
    git clone <repository-url>
-   cd proxy-review
+   cd proxy-oprimization
    ```
 
 2. **Prepare your proxy bundles**
@@ -41,59 +42,69 @@ This tool helps you maintain clean and efficient Apigee proxy bundles by:
 
 3. **Verify directory structure**
    ```
-   proxy-review/
-   ├── review.py
+   proxy-oprimization/
+   ├── review_optimize.py
    ├── proxies/           # Place your proxy ZIP files here
    ├── output/           # Generated reports and cleaned proxies
+   ├── config_local.yaml # Local mode config (see below)
+   ├── config_remote.yaml # Remote mode config (see below)
    └── README.md
    ```
+
+## Configuration
+
+The tool requires a configuration YAML file, provided via the `--config` argument. Two example configs are provided:
+
+- **Local mode (`config_local.yaml`)**: Use this if you want to analyze proxy bundles already present in the `proxies/` directory.
+  ```yaml
+  mode: local_proxy
+  ```
+- **Remote mode (`config_remote.yaml`)**: Use this to download deployed proxies from Apigee before analysis. Requires organization and environment info.
+  ```yaml
+  mode: remote_proxy
+  org: <your-apigee-org>
+  env: <your-apigee-env>
+  # proxies: [optional, list of proxy names to download]
+  ```
+  You must also provide an OAuth2 token with the `--token` argument in remote mode.
 
 ## Usage
 
 ### Basic Command Format
 
 ```bash
-python review.py <rule>:<variant> [<rule>:<variant> ...]
+python review_optimize.py --config <config_file.yaml> [--token <token>] <rule>:<variant> [<rule>:<variant> ...]
 ```
+
+- Use `config_local.yaml` for local analysis, or `config_remote.yaml` for remote download and analysis.
+- The `--token` argument is required only for remote mode.
 
 ### Examples
 
-#### Example 1: Analyze unattached policies and apply fixes
+#### Example 1: Analyze unattached policies and apply fixes (local mode)
 ```bash
-python review.py unattached-policy:apply-and-report
+python review_optimize.py --config config_local.yaml unattached-policy:apply-and-report
 ```
-This command will:
-- Find all unattached policies in your proxy bundles
-- Remove them from the proxy configurations
-- Generate cleaned proxy bundles in `output/proxies/`
-- Create a summary report in `output/unattached_policies_summary.txt`
-- Generate a size comparison report in `output/refactor_summary_report.md`
 
-#### Example 2: Report-only analysis of unattached policies
+#### Example 2: Report-only analysis of unattached policies (local mode)
 ```bash
-python review.py unattached-policy:report-only
+python review_optimize.py --config config_local.yaml unattached-policy:report-only
 ```
-This command will:
-- Find all unattached policies in your proxy bundles
-- Generate a report without making any changes
-- Create a summary report in `output/unattached_policies_summary.txt`
 
-#### Example 3: Analyze sequential JavaScript steps
+#### Example 3: Analyze sequential JavaScript steps (local mode)
 ```bash
-python review_optimize.py sequential-js:report-only
+python review_optimize.py --config config_local.yaml sequential-js:report-only
 ```
-This command will:
-- Identify JavaScript policies that run sequentially without conditions
-- Generate a report in `output/sequential_js_steps_report.txt`
 
-#### Example 4: Combined analysis (as mentioned in your example)
+#### Example 4: Combined analysis (local mode)
 ```bash
-python review.py unattached-policy:apply-and-report sequential-js:report-only
+python review_optimize.py --config config_local.yaml unattached-policy:apply-and-report sequential-js:report-only
 ```
-This command will:
-- Remove unattached policies and generate cleaned bundles
-- Analyze sequential JavaScript steps
-- Generate comprehensive reports for both analyses
+
+#### Example 5: Analyze unattached policies and apply fixes (remote mode)
+```bash
+python review_optimize.py --config config_remote.yaml --token <YOUR_OAUTH2_TOKEN> unattached-policy:apply-and-report
+```
 
 ## Output Files
 
